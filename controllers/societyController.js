@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const User = require('../models/userModel');
 
 exports.getSetupStatus = async (req, res) => {
   const { secretaryId } = req.query;
@@ -83,23 +84,39 @@ exports.createOrUpdateSociety = async (req, res) => {
   }
 
   try {
-    let result = await pool.query('SELECT id FROM societies WHERE created_by = $1', [secretaryId]);
-    if (result.rows.length > 0) {
-      // Update
+    await pool.query('BEGIN'); // Start transaction
+
+    let societyResult = await pool.query('SELECT id FROM societies WHERE created_by = $1', [secretaryId]);
+    let societyId;
+
+    if (societyResult.rows.length > 0) {
+      // Update existing society
+      societyId = societyResult.rows[0].id;
       await pool.query(
-        'UPDATE societies SET name=$1, address=$2, city=$3, pincode=$4, registration_number=$5 WHERE created_by=$6',
-        [name, address, city, pincode, registrationNumber, secretaryId]
+        'UPDATE societies SET name=$1, address=$2, city=$3, pincode=$4, registration_number=$5 WHERE id=$6',
+        [name, address, city, pincode, registrationNumber, societyId]
       );
-      res.json({ message: 'Society updated' });
     } else {
-      // Insert
-      await pool.query(
-        'INSERT INTO societies (name, address, city, pincode, registration_number, created_by) VALUES ($1,$2,$3,$4,$5,$6)',
+      // Insert new society and get its ID
+      const newSocietyResult = await pool.query(
+        'INSERT INTO societies (name, address, city, pincode, registration_number, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
         [name, address, city, pincode, registrationNumber, secretaryId]
       );
-      res.json({ message: 'Society created' });
+      societyId = newSocietyResult.rows[0].id;
     }
+
+    // Update the user's society_id
+    await pool.query(
+      'UPDATE users SET society_id = $1 WHERE id = $2',
+      [societyId, secretaryId]
+    );
+
+    await pool.query('COMMIT'); // Commit transaction
+
+    res.json({ message: 'Society details saved successfully', societyId: societyId });
+
   } catch (err) {
+    await pool.query('ROLLBACK'); // Rollback on error
     console.error('Error in createOrUpdateSociety:', err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -225,5 +242,36 @@ exports.getSocietyBySecretary = async (req, res) => {
   } catch (err) {
     console.error('Error in getSocietyBySecretary:', err.message);
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}; 
+
+// Get all residents for a society
+exports.getResidentsBySociety = async (req, res) => {
+  const { societyId } = req.query;
+  if (!societyId) {
+    return res.status(400).json({ message: 'societyId is required' });
+  }
+  try {
+    const residents = await User.getResidentsBySocietyId(societyId);
+    res.json({ data: residents });
+  } catch (err) {
+    console.error('Error in getResidentsBySociety:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+// Update a resident by id
+exports.updateResident = async (req, res) => {
+  const { residentId } = req.params;
+  const updateFields = req.body;
+  if (!residentId || !updateFields || Object.keys(updateFields).length === 0) {
+    return res.status(400).json({ message: 'residentId and update fields are required' });
+  }
+  try {
+    const updated = await User.updateResidentById(residentId, updateFields);
+    res.json({ data: updated });
+  } catch (err) {
+    console.error('Error in updateResident:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 }; 

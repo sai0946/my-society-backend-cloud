@@ -20,4 +20,10 @@ router.post('/amenities', societyController.saveAmenities);
 // Get society by secretaryId
 router.get('/by-secretary', societyController.getSocietyBySecretary);
 
+// Get all residents for a society
+router.get('/residents', societyController.getResidentsBySociety);
+
+// Update a resident by id
+router.put('/residents/:residentId', societyController.updateResident);
+
 module.exports = router; 

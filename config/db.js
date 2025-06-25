@@ -2,11 +2,22 @@ require('dotenv').config();
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // required by Supabase
+  },
 });
+
+// Set default schema to 'public'
+pool.connect()
+  .then(client => {
+    return client
+      .query('SET search_path TO public')
+      .then(() => client.release())
+      .catch(err => {
+        client.release();
+        console.error('Error setting search_path:', err.stack);
+      });
+  });
 
 module.exports = pool;

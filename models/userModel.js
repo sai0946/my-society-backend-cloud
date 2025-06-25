@@ -35,9 +35,39 @@ async function findPendingMemberByMobile(mobileNumber) {
   return result.rows[0];
 }
 
+// Get all residents by society_id
+async function getResidentsBySocietyId(societyId) {
+  const result = await pool.query(
+    'SELECT id, full_name, mobile_number, email, flat_number, role, society_id FROM users WHERE society_id = $1',
+    [societyId]
+  );
+  return result.rows;
+}
+
+// Update resident info by id
+async function updateResidentById(id, updateFields) {
+  const fields = [];
+  const values = [];
+  let idx = 1;
+  for (const key in updateFields) {
+    fields.push(`${key} = $${idx}`);
+    values.push(updateFields[key]);
+    idx++;
+  }
+  values.push(id);
+  const setClause = fields.join(', ');
+  const result = await pool.query(
+    `UPDATE users SET ${setClause}, updated_at = NOW() WHERE id = $${idx} RETURNING id, full_name, mobile_number, email, flat_number, role, society_id`,
+    values
+  );
+  return result.rows[0];
+}
+
 module.exports = {
   createUser,
   findUserByMobile,
   createPendingMember,
   findPendingMemberByMobile,
+  getResidentsBySocietyId,
+  updateResidentById,
 }; 
