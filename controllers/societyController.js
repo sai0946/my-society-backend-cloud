@@ -77,7 +77,7 @@ exports.getSetupStatus = async (req, res) => {
 };
 
 exports.createOrUpdateSociety = async (req, res) => {
-  const { name, address, city, pincode, registrationNumber, secretaryId } = req.body;
+  const { name, address, city, pincode, registrationNumber, secretaryId, upiId } = req.body;
   
   if (!secretaryId) {
     return res.status(400).json({ message: 'Secretary ID is required' });
@@ -93,14 +93,14 @@ exports.createOrUpdateSociety = async (req, res) => {
       // Update existing society
       societyId = societyResult.rows[0].id;
       await pool.query(
-        'UPDATE societies SET name=$1, address=$2, city=$3, pincode=$4, registration_number=$5 WHERE id=$6',
-        [name, address, city, pincode, registrationNumber, societyId]
+        'UPDATE societies SET name=$1, address=$2, city=$3, pincode=$4, registration_number=$5, upi_id=$6 WHERE id=$7',
+        [name, address, city, pincode, registrationNumber, upiId, societyId]
       );
     } else {
       // Insert new society and get its ID
       const newSocietyResult = await pool.query(
-        'INSERT INTO societies (name, address, city, pincode, registration_number, created_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
-        [name, address, city, pincode, registrationNumber, secretaryId]
+        'INSERT INTO societies (name, address, city, pincode, registration_number, upi_id, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+        [name, address, city, pincode, registrationNumber, upiId, secretaryId]
       );
       societyId = newSocietyResult.rows[0].id;
     }
@@ -208,7 +208,7 @@ exports.saveAmenities = async (req, res) => {
 exports.getSocietyDetails = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, address, city, pincode, registration_number, created_by FROM societies'
+      'SELECT id, name, address, city, pincode, registration_number, upi_id, created_by FROM societies'
     );
     
     res.json({
@@ -232,7 +232,7 @@ exports.getSocietyBySecretary = async (req, res) => {
   }
   try {
     const result = await pool.query(
-      'SELECT id, name, address, city, pincode, registration_number FROM societies WHERE created_by = $1',
+      'SELECT id, name, address, city, pincode, registration_number, upi_id FROM societies WHERE created_by = $1',
       [secretaryId]
     );
     if (result.rows.length === 0) {
