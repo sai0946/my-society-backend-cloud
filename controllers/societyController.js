@@ -123,7 +123,7 @@ exports.createOrUpdateSociety = async (req, res) => {
 };
 
 exports.saveMaintenanceSettings = async (req, res) => {
-  const { amount, billingCycle, dueDay, secretaryId } = req.body;
+  const { amount, billingCycle, dueDay, secretaryId, upiId } = req.body;
   
   if (!secretaryId) {
     return res.status(400).json({ message: 'Secretary ID is required' });
@@ -138,13 +138,39 @@ exports.saveMaintenanceSettings = async (req, res) => {
     const societyId = societyResult.rows[0].id;
 
     await pool.query(
-      'INSERT INTO maintenance_settings (society_id, amount, billing_cycle, due_day) VALUES ($1,$2,$3,$4) ON CONFLICT (society_id) DO UPDATE SET amount=$2, billing_cycle=$3, due_day=$4',
-      [societyId, amount, billingCycle, dueDay]
+      'INSERT INTO maintenance_settings (society_id, amount, billing_cycle, due_day, upi_id) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (society_id) DO UPDATE SET amount=$2, billing_cycle=$3, due_day=$4, upi_id=$5',
+      [societyId, amount, billingCycle, dueDay, upiId]
     );
     res.json({ message: 'Maintenance settings saved' });
   } catch (err) {
     console.error('Error in saveMaintenanceSettings:', err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+exports.getMaintenanceSettings = async (req, res) => {
+  const { secretaryId } = req.query;
+  if (!secretaryId) {
+    return res.status(400).json({ message: 'secretaryId is required' });
+  }
+  try {
+    // Get the society ID for the given secretary
+    const societyResult = await pool.query('SELECT id FROM societies WHERE created_by = $1', [secretaryId]);
+    if (societyResult.rows.length === 0) {
+      return res.status(400).json({ message: 'No society found for this secretary' });
+    }
+    const societyId = societyResult.rows[0].id;
+    const result = await pool.query(
+      'SELECT amount, billing_cycle, due_day, upi_id FROM maintenance_settings WHERE society_id = $1',
+      [societyId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'No maintenance settings found for this society' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('Error in getMaintenanceSettings:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 };
 

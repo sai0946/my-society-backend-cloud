@@ -13,6 +13,7 @@ router.post('/details', societyController.createOrUpdateSociety);
 
 // Step 2: Maintenance Settings
 router.post('/maintenance', societyController.saveMaintenanceSettings);
+router.get('/maintenance', societyController.getMaintenanceSettings);
 
 // Step 3: Amenity Setup
 router.post('/amenities', societyController.saveAmenities);
