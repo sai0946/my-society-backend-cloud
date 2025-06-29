@@ -27,4 +27,7 @@ router.get('/residents', societyController.getResidentsBySociety);
 // Update a resident by id
 router.put('/residents/:residentId', societyController.updateResident);
 
+// Get a resident by id
+router.get('/residents/:residentId', societyController.getResidentById);
+
 module.exports = router; 

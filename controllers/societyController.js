@@ -301,3 +301,23 @@ exports.updateResident = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 }; 
+
+exports.getResidentById = async (req, res) => {
+  const { residentId } = req.params;
+  if (!residentId) {
+    return res.status(400).json({ message: 'residentId is required' });
+  }
+  try {
+    const result = await pool.query(
+      'SELECT id, full_name, mobile_number, email, flat_number, role, society_id FROM users WHERE id = $1',
+      [residentId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Resident not found' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('Error in getResidentById:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+}; 
