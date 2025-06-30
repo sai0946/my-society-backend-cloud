@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 app.use('/api/auth', authRoutes);
 app.use('/api/societies', require('./routes/society'));
 app.use('/api/pending-users', require('./routes/pendingUsers'));
+app.use('/api/payments', require('./routes/payments'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
