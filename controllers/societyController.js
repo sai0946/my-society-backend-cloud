@@ -233,16 +233,34 @@ exports.saveAmenities = async (req, res) => {
 
 exports.getSocietyDetails = async (req, res) => {
   try {
-    let query = 'SELECT id, name, address, city, pincode, registration_number, upi_id, created_by FROM societies';
+    let query =
+      'SELECT s.id, s.name, s.address, s.city, s.pincode, s.registration_number, s.created_by, ms.amount, ms.upi_id ' +
+      'FROM societies s ' +
+      'LEFT JOIN maintenance_settings ms ON s.id = ms.society_id';
     let params = [];
     if (req.query.societyId) {
-      query += ' WHERE id = $1';
+      query += ' WHERE s.id = $1';
       params.push(req.query.societyId);
     }
     const result = await pool.query(query, params);
+
+    const data = result.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      address: row.address,
+      city: row.city,
+      pincode: row.pincode,
+      registration_number: row.registration_number,
+      created_by: row.created_by,
+      maintenance_settings: {
+        amount: row.amount,
+        upi_id: row.upi_id,
+      },
+    }));
+
     res.json({
       success: true,
-      data: result.rows
+      data: data,
     });
   } catch (err) {
     console.error('Error in getSocietyDetails:', err.message);
