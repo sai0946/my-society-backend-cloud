@@ -233,10 +233,13 @@ exports.saveAmenities = async (req, res) => {
 
 exports.getSocietyDetails = async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT id, name, address, city, pincode, registration_number, upi_id, created_by FROM societies'
-    );
-    
+    let query = 'SELECT id, name, address, city, pincode, registration_number, upi_id, created_by FROM societies';
+    let params = [];
+    if (req.query.societyId) {
+      query += ' WHERE id = $1';
+      params.push(req.query.societyId);
+    }
+    const result = await pool.query(query, params);
     res.json({
       success: true,
       data: result.rows
