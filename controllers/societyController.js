@@ -257,7 +257,7 @@ exports.getSocietyDetails = async (req, res) => {
         upi_id: row.upi_id,
       },
     }));
-
+    
     res.json({
       success: true,
       data: data,
