@@ -11,4 +11,7 @@ router.get('/', noticeController.getNoticesBySociety);
 // Delete a notice by id
 router.delete('/:id', noticeController.deleteNotice);
 
+// Update a notice by id
+router.put('/:id', noticeController.updateNotice);
+
 module.exports = router; 

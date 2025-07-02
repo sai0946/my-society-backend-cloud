@@ -20,8 +20,17 @@ const deleteNotice = async (id) => {
   await db.query(`DELETE FROM notices WHERE id = $1`, [id]);
 };
 
+const updateNotice = async (id, title, content) => {
+  const result = await db.query(
+    `UPDATE notices SET title = $1, content = $2 WHERE id = $3 RETURNING *`,
+    [title, content, id]
+  );
+  return result.rows[0];
+};
+
 module.exports = {
   createNotice,
   getNoticesBySociety,
   deleteNotice,
+  updateNotice,
 }; 

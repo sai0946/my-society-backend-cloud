@@ -37,4 +37,21 @@ exports.deleteNotice = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
+};
+
+exports.updateNotice = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { title, content } = req.body;
+    if (!id || !title || !content) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    const updated = await noticeService.updateNotice(id, title, content);
+    if (!updated) {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
 }; 
