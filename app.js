@@ -12,6 +12,7 @@ app.use('/api/societies', require('./routes/society'));
 app.use('/api/pending-users', require('./routes/pendingUsers'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/notices', require('./routes/notices'));
+app.use('/api/complaints', require('./routes/complaints'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
