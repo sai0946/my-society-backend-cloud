@@ -126,4 +126,22 @@ exports.getPaymentHistory = async (req, res) => {
     console.error('Error in getPaymentHistory:', err.message);
     res.status(500).json({ success: false, message: 'Server error' });
   }
+};
+
+// Get bill line items for a user and month
+exports.getBillLineItems = async (req, res) => {
+  const { userId, societyId, paymentMonth } = req.query;
+  if (!userId || !societyId || !paymentMonth) {
+    return res.status(400).json({ message: 'userId, societyId, and paymentMonth are required' });
+  }
+  try {
+    const result = await pool.query(
+      'SELECT description, amount FROM bill_line_items WHERE user_id = $1 AND society_id = $2 AND payment_month = $3',
+      [userId, societyId, paymentMonth]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('Error in getBillLineItems:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
 }; 

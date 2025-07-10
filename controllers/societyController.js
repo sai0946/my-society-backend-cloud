@@ -342,3 +342,90 @@ exports.getResidentById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 }; 
+
+// Add this function to fetch amenities for a society
+exports.getAmenities = async (req, res) => {
+  try {
+    const { societyId, secretaryId } = req.query;
+    let sid = societyId;
+    if (!sid && secretaryId) {
+      // Get societyId from secretaryId
+      const societyResult = await pool.query('SELECT id FROM societies WHERE created_by = $1', [secretaryId]);
+      if (societyResult.rows.length === 0) {
+        return res.status(400).json({ message: 'No society found for this secretary' });
+      }
+      sid = societyResult.rows[0].id;
+    }
+    if (!sid) {
+      return res.status(400).json({ message: 'societyId or secretaryId is required' });
+    }
+    const amenitiesResult = await pool.query(
+      'SELECT id, name, allowed_days, time_slots FROM amenities WHERE society_id = $1',
+      [sid]
+    );
+    res.json({ success: true, amenities: amenitiesResult.rows });
+  } catch (err) {
+    console.error('Error in getAmenities:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}; 
+
+// Add this function to handle booking an amenity
+exports.bookAmenity = async (req, res) => {
+  try {
+    const { societyId, amenityId, userId, date, slot, duration, residentsAttending, notes } = req.body;
+    if (!societyId || !amenityId || !userId || !date || !slot || !duration) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+    // Fetch amenity details (for fee and name)
+    const amenityResult = await pool.query('SELECT name, booking_fee FROM amenities WHERE id = $1', [amenityId]);
+    if (amenityResult.rows.length === 0) {
+      return res.status(400).json({ message: 'Amenity not found' });
+    }
+    const amenityName = amenityResult.rows[0].name;
+    const bookingFee = amenityResult.rows[0].booking_fee || 0;
+    // Insert booking
+    const bookingInsert = await pool.query(
+      'INSERT INTO amenity_bookings (society_id, amenity_id, user_id, date, slot, duration, residents_attending, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
+      [societyId, amenityId, userId, date, slot, duration, residentsAttending || null, notes || null]
+    );
+    const amenityBookingId = bookingInsert.rows[0].id;
+    // Add bill line item for the correct month
+    const paymentMonth = new Date(date).toISOString().slice(0, 7); // 'YYYY-MM'
+    const description = `Amenity Booking: ${amenityName} on ${date} (${slot})`;
+    await pool.query(
+      'INSERT INTO bill_line_items (user_id, society_id, payment_month, description, amount, amenity_booking_id) VALUES ($1, $2, $3, $4, $5, $6)',
+      [userId, societyId, paymentMonth, description, bookingFee, amenityBookingId]
+    );
+    res.json({ success: true, message: 'Amenity booked successfully' });
+  } catch (err) {
+    console.error('Error in bookAmenity:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}; 
+
+// Get amenity bookings for a user and/or society
+exports.getAmenityBookings = async (req, res) => {
+  const { userId, societyId } = req.query;
+  if (!userId && !societyId) {
+    return res.status(400).json({ message: 'userId or societyId is required' });
+  }
+  try {
+    let query = 'SELECT * FROM amenity_bookings WHERE 1=1';
+    const params = [];
+    if (userId) {
+      params.push(userId);
+      query += ` AND user_id = $${params.length}`;
+    }
+    if (societyId) {
+      params.push(societyId);
+      query += ` AND society_id = $${params.length}`;
+    }
+    query += ' ORDER BY date DESC, slot';
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    console.error('Error in getAmenityBookings:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+}; 

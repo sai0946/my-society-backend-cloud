@@ -17,6 +17,11 @@ router.get('/maintenance', societyController.getMaintenanceSettings);
 
 // Step 3: Amenity Setup
 router.post('/amenities', societyController.saveAmenities);
+// Add GET endpoint for amenities
+router.get('/amenities', societyController.getAmenities);
+
+// Add POST endpoint for booking an amenity
+router.post('/book-amenity', societyController.bookAmenity);
 
 // Get society by secretaryId
 router.get('/by-secretary', societyController.getSocietyBySecretary);
@@ -29,5 +34,8 @@ router.put('/residents/:residentId', societyController.updateResident);
 
 // Get a resident by id
 router.get('/residents/:residentId', societyController.getResidentById);
+
+// Get amenity bookings for a user and/or society
+router.get('/amenity-bookings', societyController.getAmenityBookings);
 
 module.exports = router; 

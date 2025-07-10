@@ -14,4 +14,7 @@ router.get('/pending', paymentController.getPendingPayments);
 // Route to get a user's payment history
 router.get('/history', paymentController.getPaymentHistory);
 
+// Get bill line items for a user and month
+router.get('/bill-line-items', paymentController.getBillLineItems);
+
 module.exports = router; 
