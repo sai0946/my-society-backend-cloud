@@ -359,8 +359,9 @@ exports.getAmenities = async (req, res) => {
     if (!sid) {
       return res.status(400).json({ message: 'societyId or secretaryId is required' });
     }
+    // Return all fields for amenities, including booking_fee
     const amenitiesResult = await pool.query(
-      'SELECT id, name, allowed_days, time_slots FROM amenities WHERE society_id = $1',
+      'SELECT * FROM amenities WHERE society_id = $1',
       [sid]
     );
     res.json({ success: true, amenities: amenitiesResult.rows });
