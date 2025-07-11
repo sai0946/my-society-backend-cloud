@@ -13,21 +13,16 @@ exports.getSetupStatus = async (req, res) => {
     );
 
     if (societyResult.rows.length === 0) {
-      return res.json({ isSetupComplete: false });
+      return res.json({ isSetupComplete: false, details: { hasSocietyDetails: false, hasMaintenanceSettings: false, hasAmenities: false } });
     }
 
     const society = societyResult.rows[0];
 
     // Check if all mandatory society fields are filled
-    const hasSocietyDetails = society.name && 
-                            society.address && 
-                            society.city && 
-                            society.pincode;
+    const hasSocietyDetails = !!(society.name && society.address && society.city && society.pincode);
 
     // Check if maintenance settings are filled
-    const hasMaintenanceSettings = society.amount && 
-                                 society.billing_cycle && 
-                                 society.due_day;
+    const hasMaintenanceSettings = !!(society.amount && society.billing_cycle && society.due_day);
 
     // Get amenities
     const amenitiesResult = await pool.query(
@@ -35,32 +30,18 @@ exports.getSetupStatus = async (req, res) => {
       [society.id]
     );
 
-    // If no amenities, consider setup complete
-    if (amenitiesResult.rows.length === 0) {
-      return res.json({
-        isSetupComplete: true,
-        details: {
-          hasSocietyDetails,
-          hasMaintenanceSettings,
-          hasAmenities: false
-        }
-      });
-    }
-
     // Check if at least one amenity exists with all required fields
     const hasAmenities = amenitiesResult.rows.length > 0 && 
-                        amenitiesResult.rows.every(amenity => 
-                          amenity.name && 
-                          amenity.allowed_days && 
-                          amenity.allowed_days.length > 0 && 
-                          amenity.time_slots && 
-                          amenity.time_slots.length > 0
-                        );
+      amenitiesResult.rows.every(amenity => 
+        amenity.name && 
+        amenity.allowed_days && 
+        amenity.allowed_days.length > 0 && 
+        amenity.time_slots && 
+        amenity.time_slots.length > 0
+      );
 
     // Setup is complete only if all mandatory fields are filled
-    const isSetupComplete = hasSocietyDetails && 
-                           hasMaintenanceSettings && 
-                           hasAmenities;
+    const isSetupComplete = hasSocietyDetails && hasMaintenanceSettings && hasAmenities;
 
     res.json({ 
       isSetupComplete,
