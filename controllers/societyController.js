@@ -32,13 +32,13 @@ exports.getSetupStatus = async (req, res) => {
 
     // Check if at least one amenity exists with all required fields
     const hasAmenities = amenitiesResult.rows.length > 0 && 
-      amenitiesResult.rows.every(amenity => 
-        amenity.name && 
-        amenity.allowed_days && 
-        amenity.allowed_days.length > 0 && 
-        amenity.time_slots && 
-        amenity.time_slots.length > 0
-      );
+                        amenitiesResult.rows.every(amenity => 
+                          amenity.name && 
+                          amenity.allowed_days && 
+                          amenity.allowed_days.length > 0 && 
+                          amenity.time_slots && 
+                          amenity.time_slots.length > 0
+                        );
 
     // Setup is complete only if all mandatory fields are filled
     const isSetupComplete = hasSocietyDetails && hasMaintenanceSettings && hasAmenities;
@@ -155,63 +155,6 @@ exports.getMaintenanceSettings = async (req, res) => {
   }
 };
 
-exports.saveAmenities = async (req, res) => {
-  const { amenities, secretaryId } = req.body;
-  
-  if (!secretaryId) {
-    return res.status(400).json({ message: 'Secretary ID is required' });
-  }
-
-  try {
-    // Get the society ID for the given secretary
-    const societyResult = await pool.query('SELECT id FROM societies WHERE created_by = $1', [secretaryId]);
-    if (societyResult.rows.length === 0) {
-      return res.status(400).json({ message: 'No society found for this secretary' });
-    }
-    const societyId = societyResult.rows[0].id;
-
-    // Validate input
-    if (!Array.isArray(amenities)) {
-      return res.status(400).json({ 
-        message: 'Amenities must be an array',
-        error: 'Invalid input format'
-      });
-    }
-
-    for (const a of amenities) {
-      // Convert allowedDays and timeSlots to arrays if they're strings
-      const allowedDays = typeof a.allowedDays === 'string' 
-        ? a.allowedDays.split(',').map(day => day.trim())
-        : Array.isArray(a.allowedDays) 
-          ? a.allowedDays 
-          : [];
-          
-      const timeSlots = typeof a.timeSlots === 'string'
-        ? a.timeSlots.split(',').map(slot => slot.trim())
-        : Array.isArray(a.timeSlots)
-          ? a.timeSlots
-          : [];
-
-      await pool.query(
-        'INSERT INTO amenities (society_id, name, allowed_days, time_slots) VALUES ($1,$2,$3,$4)',
-        [societyId, a.name, allowedDays, timeSlots]
-      );
-    }
-    res.json({ message: 'Amenities saved' });
-  } catch (err) {
-    console.error('Error in saveAmenities:', {
-      error: err.message,
-      stack: err.stack,
-      requestBody: req.body
-    });
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: err.message,
-      details: 'Check server logs for more information'
-    });
-  }
-}; 
-
 exports.getSocietyDetails = async (req, res) => {
   try {
     let query =
@@ -324,90 +267,73 @@ exports.getResidentById = async (req, res) => {
   }
 }; 
 
-// Add this function to fetch amenities for a society
-exports.getAmenities = async (req, res) => {
-  try {
-    const { societyId, secretaryId } = req.query;
-    let sid = societyId;
-    if (!sid && secretaryId) {
-      // Get societyId from secretaryId
-      const societyResult = await pool.query('SELECT id FROM societies WHERE created_by = $1', [secretaryId]);
-      if (societyResult.rows.length === 0) {
-        return res.status(400).json({ message: 'No society found for this secretary' });
-      }
-      sid = societyResult.rows[0].id;
-    }
-    if (!sid) {
-      return res.status(400).json({ message: 'societyId or secretaryId is required' });
-    }
-    // Return all fields for amenities, including booking_fee
-    const amenitiesResult = await pool.query(
-      'SELECT * FROM amenities WHERE society_id = $1',
-      [sid]
-    );
-    res.json({ success: true, amenities: amenitiesResult.rows });
-  } catch (err) {
-    console.error('Error in getAmenities:', err.message);
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
-  }
-}; 
+// --- Event Management ---
 
-// Add this function to handle booking an amenity
-exports.bookAmenity = async (req, res) => {
+exports.createEvent = async (req, res) => {
   try {
-    const { societyId, amenityId, userId, date, slot, duration, residentsAttending, notes } = req.body;
-    if (!societyId || !amenityId || !userId || !date || !slot || !duration) {
+    const { society_id, title, event_type, event_date, event_time, location, description } = req.body;
+    if (!society_id || !title || !event_type || !event_date || !event_time) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
-    // Fetch amenity details (for fee and name)
-    const amenityResult = await pool.query('SELECT name, booking_fee FROM amenities WHERE id = $1', [amenityId]);
-    if (amenityResult.rows.length === 0) {
-      return res.status(400).json({ message: 'Amenity not found' });
-    }
-    const amenityName = amenityResult.rows[0].name;
-    const bookingFee = amenityResult.rows[0].booking_fee || 0;
-    // Insert booking
-    const bookingInsert = await pool.query(
-      'INSERT INTO amenity_bookings (society_id, amenity_id, user_id, date, slot, duration, residents_attending, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id',
-      [societyId, amenityId, userId, date, slot, duration, residentsAttending || null, notes || null]
+    const result = await pool.query(
+      `INSERT INTO events (society_id, title, event_type, event_date, event_time, location, description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [society_id, title, event_type, event_date, event_time, location || null, description || null]
     );
-    const amenityBookingId = bookingInsert.rows[0].id;
-    // Add bill line item for the correct month
-    const paymentMonth = new Date(date).toISOString().slice(0, 7); // 'YYYY-MM'
-    const description = `Amenity Booking: ${amenityName} on ${date} (${slot})`;
-    await pool.query(
-      'INSERT INTO bill_line_items (user_id, society_id, payment_month, description, amount, amenity_booking_id) VALUES ($1, $2, $3, $4, $5, $6)',
-      [userId, societyId, paymentMonth, description, bookingFee, amenityBookingId]
-    );
-    res.json({ success: true, message: 'Amenity booked successfully' });
+    res.status(201).json({ success: true, event: result.rows[0] });
   } catch (err) {
-    console.error('Error in bookAmenity:', err.message);
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
-}; 
+};
 
-// Get amenity bookings for a user and/or society
-exports.getAmenityBookings = async (req, res) => {
-  const { userId, societyId } = req.query;
-  if (!userId && !societyId) {
-    return res.status(400).json({ message: 'userId or societyId is required' });
-  }
+exports.getEvents = async (req, res) => {
   try {
-    let query = 'SELECT * FROM amenity_bookings WHERE 1=1';
-    const params = [];
-    if (userId) {
-      params.push(userId);
-      query += ` AND user_id = $${params.length}`;
+    const { society_id } = req.query;
+    if (!society_id) {
+      return res.status(400).json({ message: 'society_id is required' });
     }
-    if (societyId) {
-      params.push(societyId);
-      query += ` AND society_id = $${params.length}`;
-    }
-    query += ' ORDER BY date DESC, slot';
-    const result = await pool.query(query, params);
-    res.json({ success: true, data: result.rows });
+    const result = await pool.query(
+      `SELECT * FROM events WHERE society_id = $1 ORDER BY event_date DESC, event_time DESC`,
+      [society_id]
+    );
+    res.json({ success: true, events: result.rows });
   } catch (err) {
-    console.error('Error in getAmenityBookings:', err.message);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+};
+
+exports.updateEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, event_type, event_date, event_time, location, description } = req.body;
+    if (!id) {
+      return res.status(400).json({ message: 'Event id is required' });
+    }
+    const result = await pool.query(
+      `UPDATE events SET title=$1, event_type=$2, event_date=$3, event_time=$4, location=$5, description=$6, updated_at=NOW() WHERE id=$7 RETURNING *`,
+      [title, event_type, event_date, event_time, location || null, description || null, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    res.json({ success: true, event: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+};
+
+exports.deleteEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ message: 'Event id is required' });
+    }
+    const result = await pool.query(`DELETE FROM events WHERE id = $1 RETURNING *`, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    res.json({ success: true, message: 'Event deleted successfully' });
+  } catch (err) {
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 }; 
